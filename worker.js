@@ -3,19 +3,19 @@ const axios = require('axios');
 const qs = require('qs');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
-// Khởi tạo worker với dữ liệu được truyền từ thread chính
+
 const { likeUser, targetUserId, postId, proxy } = workerData;
 
-// Hàm log tùy chỉnh để gửi log về main thread
+
 function workerLog(message, type = 'info') {
-  // Ghi log vào console local
+
   if (type === 'error') {
     console.error(message);
   } else {
     console.log(message);
   }
   
-  // Gửi log về main thread để hiển thị trên cửa sổ log
+ 
   parentPort.postMessage({ 
     log: {
       type,
@@ -24,7 +24,7 @@ function workerLog(message, type = 'info') {
   });
 }
 
-// Kiểm tra dữ liệu đầu vào
+
 if (!likeUser || !targetUserId || !postId) {
   const errorMsg = `[Worker] Thiếu thông tin cần thiết: ${!likeUser ? 'likeUser, ' : ''}${!targetUserId ? 'targetUserId, ' : ''}${!postId ? 'postId' : ''}`;
   workerLog(errorMsg, 'error');
@@ -42,7 +42,7 @@ if (!likeUser || !targetUserId || !postId) {
  */
 async function performLike() {
   try {
-    // Kiểm tra xem có proxy để sử dụng không
+   
     if (!proxy || !proxy.host || !proxy.port || !proxy.name || !proxy.password) {
       workerLog(`[Worker] ❌ Không có proxy hợp lệ để sử dụng cho user ${likeUser.uid}`, 'error');
       return {
@@ -54,10 +54,10 @@ async function performLike() {
       };
     }
     
-    // Tạo proxy URL
+  
     const proxyUrl = `http://${proxy.name}:${proxy.password}@${proxy.host}:${proxy.port}`;
     
-    // Tạo agent với proxy
+   
     let httpsAgent;
     try {
       httpsAgent = new HttpsProxyAgent(proxyUrl);
@@ -72,10 +72,10 @@ async function performLike() {
       };
     }
 
-    // Tạo random User-Agent để tránh phát hiện
+    
     const userAgent = getRandomUserAgent();
 
-    // Khởi tạo Axios client
+  
     const api = axios.create({
       baseURL: 'https://pivoice.app',
       timeout: 15000, // 15 seconds
@@ -90,7 +90,6 @@ async function performLike() {
       }
     });
 
-    // Dữ liệu gửi lên API
     const payload = qs.stringify({
       component: "article",
       action: "like",
@@ -101,10 +100,9 @@ async function performLike() {
       selected_chain: 0
     });
 
-    // Thực hiện gửi request
     workerLog(`[Worker] User ${likeUser.piname} đang like bài ${postId} của user ${targetUserId} (qua ${proxy.host})`);
     
-    // Thêm jitter ngẫu nhiên để request trông tự nhiên hơn
+  
     const jitter = Math.floor(Math.random() * 1000);
     await new Promise(resolve => setTimeout(resolve, jitter));
     
@@ -141,7 +139,7 @@ async function performLike() {
     
     workerLog(`[Worker] ❌ Lỗi khi like bài ${postId}: ${errorMessage} (${statusCode || 'Không có mã lỗi'})`, 'error');
     
-    // Kiểm tra lỗi liên quan đến proxy
+    
     if (
       errorMessage.includes('ECONNREFUSED') || 
       errorMessage.includes('ETIMEDOUT') || 
@@ -186,7 +184,6 @@ function getRandomUserAgent() {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
-// Thực hiện task và gửi kết quả về main thread
 performLike()
   .then(result => {
     parentPort.postMessage({ result });

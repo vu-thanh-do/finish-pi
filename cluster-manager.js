@@ -8,28 +8,20 @@ const path = require('path');
  */
 class ClusterManager {
   constructor(options = {}) {
-    // Số lượng CPU (workers) sẽ sử dụng, mặc định là tất cả CPU
     this.numWorkers = options.numWorkers || os.cpus().length;
     
-    // Số lượng tác vụ xử lý đồng thời tối đa trên mỗi CPU/worker
     this.concurrentTasksPerWorker = options.concurrentTasksPerWorker || 10;
     
-    // Proxy manager để lấy proxies
     this.proxyManager = options.proxyManager;
     
-    // Số lượng tác vụ song song tối đa
     this.maxConcurrentTasks = this.numWorkers * this.concurrentTasksPerWorker;
     
-    // Hàng đợi tác vụ
     this.taskQueue = [];
     
-    // Số lượng tác vụ đang thực thi
     this.runningTasks = 0;
     
-    // Danh sách các worker threads
     this.workers = [];
     
-    // Kết quả tác vụ
     this.results = [];
     
     console.log(`>> Khởi tạo ClusterManager với ${this.numWorkers} CPUs và ${this.maxConcurrentTasks} tác vụ đồng thời tối đa`);
@@ -42,7 +34,6 @@ class ClusterManager {
    */
   async executeTasks(tasks) {
     return new Promise(async (resolve) => {
-      // Nếu không có tác vụ nào, trả về ngay
       if (!tasks || tasks.length === 0) {
         resolve([]);
         return;
@@ -50,13 +41,10 @@ class ClusterManager {
       
       console.log(`>> Chuẩn bị thực thi ${tasks.length} tác vụ song song với ${this.numWorkers} CPUs`);
       
-      // Thêm tất cả tác vụ vào hàng đợi
       this.taskQueue = [...tasks];
       
-      // Số lượng tác vụ ban đầu
       const totalTasks = this.taskQueue.length;
       
-      // Chức năng hoàn thành
       const checkCompletion = () => {
         if (this.results.length >= totalTasks) {
           console.log(`>> Đã hoàn thành ${this.results.length}/${totalTasks} tác vụ`);
@@ -64,41 +52,33 @@ class ClusterManager {
         }
       };
       
-      // Tạo promise để kiểm tra hoàn thành
       const executionPromise = new Promise(resolve => {
-        // Chạy tác vụ mới khi có worker rảnh
         const scheduleTask = async () => {
-          // Nếu còn tác vụ trong hàng đợi và chưa đạt giới hạn đồng thời
           while (this.taskQueue.length > 0 && this.runningTasks < this.maxConcurrentTasks) {
             const task = this.taskQueue.shift();
             this.runningTasks++;
             
             try {
-              // Lấy proxy từ proxyManager nếu có
               let proxy = null;
               if (this.proxyManager && task.likeUser) {
                 try {
                   proxy = await this.proxyManager.getRandomProxy(task.likeUser.uid);
                 } catch (err) {
                   console.warn(`>> Không thể lấy proxy ngẫu nhiên cho user ${task.likeUser.uid}: ${err.message}`);
-                  // Sử dụng proxy đã có trong task.likeUser nếu không lấy được từ ProxyManager
                   proxy = task.likeUser.proxy;
                 }
               }
               
-              // Thực thi tác vụ trong worker thread
               this.executeTaskInWorker(task, proxy)
                 .then(result => {
                   this.results.push(result);
                   this.runningTasks--;
                   
-                  // Kiểm tra nếu đã hoàn thành tất cả
                   if (this.results.length >= totalTasks) {
                     resolve();
                     return;
                   }
                   
-                  // Chạy tác vụ tiếp theo
                   scheduleTask();
                 })
                 .catch(error => {
@@ -110,13 +90,11 @@ class ClusterManager {
                   });
                   this.runningTasks--;
                   
-                  // Kiểm tra nếu đã hoàn thành tất cả
                   if (this.results.length >= totalTasks) {
                     resolve();
                     return;
                   }
                   
-                  // Chạy tác vụ tiếp theo
                   scheduleTask();
                 });
             } catch (error) {
@@ -131,14 +109,14 @@ class ClusterManager {
           }
         };
         
-        // Khởi chạy tác vụ ban đầu
+       
         scheduleTask();
       });
       
-      // Đợi tất cả tác vụ hoàn thành
+     
       await executionPromise;
       
-      // Kiểm tra lại một lần nữa
+      
       checkCompletion();
     });
   }
@@ -152,24 +130,20 @@ class ClusterManager {
   executeTaskInWorker(task, proxy) {
     return new Promise((resolve, reject) => {
       try {
-        // Đường dẫn đến file worker
         const workerPath = path.join(__dirname, 'worker.js');
         
-        // Lấy proxy từ task hoặc từ ProxyManager nếu cần
         let proxyToUse = proxy;
         
         if (!proxyToUse && this.proxyManager && task.likeUser) {
           try {
-            // Sử dụng getRandomProxy thay vì getProxyForUser
             proxyToUse = this.proxyManager.getRandomProxy(task.likeUser.uid);
           } catch (error) {
             console.warn(`>> Không thể lấy proxy cho user ${task.likeUser.uid}: ${error.message}`);
-            // Sử dụng proxy đã có trong task.likeUser nếu không lấy được từ ProxyManager
             proxyToUse = task.likeUser.proxy;
           }
         }
         
-        // Nếu vẫn không có proxy, trả về lỗi
+       
         if (!proxyToUse) {
           console.error(`>> CẢNH BÁO: Không có proxy cho user ${task.likeUser.uid}!`);
           resolve({ 
@@ -182,7 +156,7 @@ class ClusterManager {
           return;
         }
         
-        // Tạo worker thread mới
+       
         const worker = new Worker(workerPath, {
           workerData: {
             ...task,
@@ -190,9 +164,9 @@ class ClusterManager {
           }
         });
         
-        // Lắng nghe kết quả từ worker
+       
         worker.on('message', (message) => {
-          // Xử lý thông điệp log từ worker (tính năng mới)
+         
           if (message.log) {
             const { type, message: logMessage } = message.log;
             if (type === 'error') {
@@ -208,7 +182,7 @@ class ClusterManager {
             return;
           }
           
-          // Nếu worker báo cáo lỗi proxy, cập nhật ProxyManager
+         
           if (message.result && !message.result.success && message.result.statusCode === 407) {
             try {
               if (this.proxyManager && message.result.proxyHost && message.result.proxyPort) {
@@ -226,19 +200,18 @@ class ClusterManager {
           resolve(message.result);
         });
         
-        // Lắng nghe lỗi từ worker
+
         worker.on('error', (error) => {
           reject(error);
         });
         
-        // Lắng nghe sự kiện worker kết thúc
+      
         worker.on('exit', (code) => {
           if (code !== 0) {
             reject(new Error(`Worker stopped with exit code ${code}`));
           }
         });
         
-        // Thêm worker vào danh sách để theo dõi
         this.workers.push(worker);
       } catch (error) {
         reject(error);
@@ -266,7 +239,6 @@ class ClusterManager {
    * Dọn dẹp tài nguyên
    */
   cleanup() {
-    // Kết thúc tất cả worker threads
     this.workers.forEach(worker => {
       worker.terminate();
     });

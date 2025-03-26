@@ -234,7 +234,7 @@ function getRandomUsers(users, n) {
 }
 
 // Khởi tạo taskQueue ở phạm vi cấp cao để có thể truy cập từ khắp nơi
-let taskQueue = null;
+  let taskQueue = null;
 
 // Thêm vào trước task queue
 async function processLikesInParallel(userObjects, targetUserIds, postsCache, taskQueue, concurrencyLimit) {
@@ -319,70 +319,70 @@ async function processLikesInParallel(userObjects, targetUserIds, postsCache, ta
         try {
           // Thêm tác vụ vào queue và đợi kết quả
           const result = await taskQueue.add(
-            async () => {
+          async () => {
               console.log(`>> User ${likeUser.piname} like bài ${postId} của user ${targetUserId} (${i+1}/${targets.length})`);
-              
-              const maxRetries = 3;
-              let retryCount = 0;
-              
-              while (retryCount <= maxRetries) {
-                try {
-                  if (retryCount > 0) {
-                    console.log(`>> Thử lại lần ${retryCount}/${maxRetries} cho like bài ${postId}`);
+            
+            const maxRetries = 3;
+            let retryCount = 0;
+            
+            while (retryCount <= maxRetries) {
+              try {
+                if (retryCount > 0) {
+                  console.log(`>> Thử lại lần ${retryCount}/${maxRetries} cho like bài ${postId}`);
                     await sleep(1000 * retryCount); // Giảm thời gian chờ xuống 1s
-                  }
-                  
-                  const api = apiClient(likeUser, { 
-                    useProxyManager: true, 
+                }
+
+                const api = apiClient(likeUser, { 
+                  useProxyManager: true, 
                     timeout: 10000, // Giảm timeout xuống 10s
                     retries: 1
-                  });
-                  
-                  const payload = qs.stringify({
-                    component: "article",
-                    action: "like",
-                    aid: postId,
-                    user_name: likeUser.piname,
-                    english_version: 0,
-                    selected_country: 1,
-                    selected_chain: 0,
-                  });
-                  
-                  const response = await api.post('/vapi', payload);
-                  
-                  if (response.data && response.data.time) {
+                });
+                
+                const payload = qs.stringify({
+                  component: "article",
+                  action: "like",
+                  aid: postId,
+                  user_name: likeUser.piname,
+                  english_version: 0,
+                  selected_country: 1,
+                  selected_chain: 0,
+                });
+
+                const response = await api.post('/vapi', payload);
+                
+                if (response.data && response.data.time) {
                     console.log(`✅ User ${likeUser.piname} đã like thành công bài ${postId} (${i+1}/${targets.length})`);
-                    return { success: true, postId, userId: likeUser.uid, targetUserId };
-                  } else {
-                    console.log(`⚠️ Like bài ${postId} không thành công:`, response.data);
-                    return { success: false, postId, userId: likeUser.uid, targetUserId, error: JSON.stringify(response.data) };
-                  }
-                } catch (error) {
+                  return { success: true, postId, userId: likeUser.uid, targetUserId };
+                } else {
+                  console.log(`⚠️ Like bài ${postId} không thành công:`, response.data);
+                  return { success: false, postId, userId: likeUser.uid, targetUserId, error: JSON.stringify(response.data) };
+                }
+              } catch (error) {
                   console.error(`❌ Lỗi khi like bài ${postId}:`, error.message);
+                
+                if (error.response) {
+                  console.error(`Mã lỗi: ${error.response.status}`);
                   
-                  if (error.response) {
-                    console.error(`Mã lỗi: ${error.response.status}`);
-                    
-                    if ([404, 429, 500, 502, 503, 504].includes(error.response.status)) {
-                      retryCount++;
-                      if (retryCount <= maxRetries) {
+                  if ([404, 429, 500, 502, 503, 504].includes(error.response.status)) {
+                    retryCount++;
+                    if (retryCount <= maxRetries) {
                         const delayTime = error.response.status === 429 ? 5000 : 2000 * retryCount;
-                        console.log(`>> [Task] Sẽ thử lại sau ${delayTime/1000} giây...`);
-                        await sleep(delayTime);
-                        continue;
-                      }
+                      console.log(`>> [Task] Sẽ thử lại sau ${delayTime/1000} giây...`);
+                      await sleep(delayTime);
+                      continue;
                     }
                   }
-                  
-                  return { success: false, postId, userId: likeUser.uid, targetUserId, error: error.message };
                 }
+                
+                return { success: false, postId, userId: likeUser.uid, targetUserId, error: error.message };
               }
-              
-              return { success: false, postId, userId: likeUser.uid, targetUserId, error: "Đã hết số lần thử lại" };
-            },
-            likeUser.uid,
-            targetUserId
-          );
+            }
+            
+            return { success: false, postId, userId: likeUser.uid, targetUserId, error: "Đã hết số lần thử lại" };
+          },
+          likeUser.uid,
+          targetUserId
+        );
           
           // Đếm số lượt thành công/thất bại
           if (result.success) {
@@ -957,7 +957,7 @@ async function handleLikeEachOther(req) {
     logToFile(`Thành công: ${clusterResult.successCount} lượt like | Thất bại: ${clusterResult.failCount} lượt like`);
     logToFile(`Thời gian chạy: ${clusterResult.duration}`);
     logToFile(`======= KẾT THÚC TIẾN TRÌNH LIKE CHÉO =======`);
-    
+
     return { 
       success: clusterResult.successCount > 0,
       message: `Đã like ${clusterResult.successCount}/${clusterResult.totalAssigned} lượt thành công!`,

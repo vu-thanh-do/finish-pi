@@ -4,14 +4,13 @@ const EventEmitter = require('events');
 const { handleLike } = require('./like');
 const { handlePiKnow } = require('./piKnow');
 
-const { handleComment } = require('./comments');
 const { handlePostArticles } = require('./posts');
 const handleDelete = require('./delete');
 const ExcelReaderService = require('../models/excelSheed');
 const path = require('path');
 const handleLogin = require('./login');
 const handleLikeEachOther = require('./likeEachOther');
-
+const handleCommentController = require('./commentController');
 // Tạo event emitter để quản lý tiến độ
 const progressEmitter = new EventEmitter();
 
@@ -50,7 +49,7 @@ async function executeTask(task, config) {
                 break;
 
             case 'comment':
-                result = await handleComment(count || 1);
+                result = await handleCommentController(count || 1);
                 break;
 
             case 'post':

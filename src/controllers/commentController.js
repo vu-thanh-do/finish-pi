@@ -1,10 +1,11 @@
-const path = require("path");
-const ExcelReaderService = require("../models/excelSheed");
+const path = require('path');
+const ExcelReaderService = require('../models/excelSheed');
+const commentService = require('../services/commentService');
+const ProxyManager = require('../services/ProxyManager');
+const apiClient = require('../api/apiClient');
 const { cpus } = require('os');
 const fs = require('fs');
 const { formatDuration, sleep } = require('../utils/helpers');
-const ProxyManager = require('../services/ProxyManager');
-const piknowService = require('../services/piknowService');
 
 /**
  * Ghi log vào file
@@ -23,7 +24,7 @@ function logToFile(message) {
     const dateStr = date.toISOString().split('T')[0];
     const timestamp = `[${date.toLocaleTimeString()}]`;
     
-    const logFilePath = path.join(logsDir, `pi-automate-piknow-logs-${dateStr}.txt`);
+    const logFilePath = path.join(logsDir, `pi-automate-comment-logs-${dateStr}.txt`);
     
     // Thêm timestamp vào message
     const logMessage = `${timestamp} ${message}\n`;
@@ -35,18 +36,19 @@ function logToFile(message) {
   }
 }
 
-async function handlePiKnow(piknowCount) {
+async function handleComment(commentCount) {
   // Khởi tạo các dịch vụ
   const proxyManager = new ProxyManager();
   const startTime = Date.now();
   
-  logToFile(`======= BẮT ĐẦU TIẾN TRÌNH PIKNOW =======`);
+  logToFile(`======= BẮT ĐẦU TIẾN TRÌNH COMMENT =======`);
   logToFile(`Phiên bản: v1.0 (Xử lý song song với đa luồng)`);
   
   try {
-    // Khởi tạo ProxyManager
+    // Khởi tạo ProxyManager và thiết lập cho apiClient
     logToFile(`Khởi tạo ProxyManager...`);
     await proxyManager.initialize();
+    apiClient.setGlobalProxyManager(proxyManager);
     
     // Cấu hình cố định cho 2.000 tài khoản
     const FIXED_CONFIG = {
@@ -62,15 +64,15 @@ async function handlePiKnow(piknowCount) {
     // Sử dụng cấu hình cố định
     let requestConfig = FIXED_CONFIG;
     
-    // Nếu piknowCount là một số, nghĩa là được gọi từ main.js
-    if (typeof piknowCount === 'number') {
-      logToFile(`Được gọi từ giao diện với ${piknowCount} piknow cho mỗi user, áp dụng cấu hình cố định cho 2.000 tài khoản`);
+    // Nếu commentCount là một số, nghĩa là được gọi từ main.js
+    if (typeof commentCount === 'number') {
+      logToFile(`Được gọi từ giao diện với ${commentCount} comment cho mỗi user, áp dụng cấu hình cố định cho 2.000 tài khoản`);
     } 
-    // Nếu piknowCount là object có chứa body (từ API)
-    else if (piknowCount && piknowCount.body) {
+    // Nếu commentCount là object có chứa body (từ API)
+    else if (commentCount && commentCount.body) {
       // Chỉ lấy đường dẫn file Excel nếu có
-      if (piknowCount.body.excelPath) {
-        requestConfig.excelPath = piknowCount.body.excelPath;
+      if (commentCount.body.excelPath) {
+        requestConfig.excelPath = commentCount.body.excelPath;
       }
       logToFile(`Được gọi từ API, áp dụng cấu hình cố định cho 2.000 tài khoản`);
     }
@@ -112,8 +114,8 @@ async function handlePiKnow(piknowCount) {
         
         users.push({
           uid: uid[i],
-          piname: piname[i],
           ukey: ukey[i],
+          piname: piname[i],
           active: true, // Giả định tất cả user đều active
           proxy: proxyInfo ? {
             host: proxyInfo[0],
@@ -162,13 +164,13 @@ async function handlePiKnow(piknowCount) {
     logToFile(`STEP 2: Lọc được ${filteredUsers.length}/${users.length} user hợp lệ`);
     
     // Step 3: Chọn số lượng user theo yêu cầu
-    console.log(`\n>> STEP 3: Chọn ${requestConfig.userCount} user để thực hiện piknow...`);
-    // Lấy ngẫu nhiên userCount user để thực hiện piknow
+    console.log(`\n>> STEP 3: Chọn ${requestConfig.userCount} user để thực hiện comment...`);
+    // Lấy ngẫu nhiên userCount user để thực hiện comment
     const selectedUsers = filteredUsers.length > requestConfig.userCount ? 
       getRandomUsers(filteredUsers, requestConfig.userCount) : filteredUsers;
     
-    console.log(`>> Đã chọn ${selectedUsers.length} user để thực hiện piknow`);
-    logToFile(`STEP 3: Đã chọn ${selectedUsers.length} user để thực hiện piknow`);
+    console.log(`>> Đã chọn ${selectedUsers.length} user để thực hiện comment`);
+    logToFile(`STEP 3: Đã chọn ${selectedUsers.length} user để thực hiện comment`);
     
     // STEP 3.5: Thiết lập proxy cho các user
     console.log(`\n>> STEP 3.5: Thiết lập proxy cho các user...`);
@@ -199,39 +201,38 @@ async function handlePiKnow(piknowCount) {
     const proxyStats = proxyManager.getProxyStats();
     console.log(`>> Thống kê proxy: ${proxyStats.active}/${proxyStats.total} proxy hoạt động, ${proxyStats.fromExcel} từ Excel, ${proxyStats.fromRotating} từ rotating`);
     
-    // Step 4: Thực hiện piknow
-    console.log(`\n>> STEP 4: Bắt đầu thực hiện piknow...`);
-    logToFile(`STEP 4: Bắt đầu thực hiện piknow với ${piknowCount} bài cho mỗi user`);
+    // Step 4: Thực hiện comment
+    console.log(`\n>> STEP 4: Bắt đầu thực hiện comment...`);
+    logToFile(`STEP 4: Bắt đầu thực hiện comment với ${commentCount} comment cho mỗi user`);
     
-    // Cấu hình piknowService với cài đặt Cluster và Proxy
-    piknowService.configureService({
+    // Cấu hình commentService với cài đặt Cluster và Proxy
+    commentService.configureService({
       numWorkers: requestConfig.numCpus,
       concurrentTasksPerWorker: requestConfig.tasksPerCpu,
       proxyManager: proxyManager,
       users: userObjects
     });
     
-    const result = await piknowService.startPiKnowProcess(piknowCount);
+    const result = await commentService.startCommentProcess(commentCount);
     
     const endTime = Date.now();
     const totalDuration = formatDuration(endTime - startTime);
     
-    console.log(`\n>> Kết quả cuối cùng: ${result.success}/${result.total} piknow thành công`);
+    console.log(`\n>> Kết quả cuối cùng: ${result.success}/${result.total} comment thành công`);
     console.log(`>> Thời gian chạy: ${totalDuration}`);
     
     logToFile(`====== KẾT QUẢ CUỐI CÙNG ======`);
-    logToFile(`Thành công: ${result.success} piknow | Thất bại: ${result.failure} piknow`);
+    logToFile(`Thành công: ${result.success} comment | Thất bại: ${result.failure} comment`);
     logToFile(`Thời gian chạy: ${totalDuration}`);
-    logToFile(`======= KẾT THÚC TIẾN TRÌNH PIKNOW =======`);
+    logToFile(`======= KẾT THÚC TIẾN TRÌNH COMMENT =======`);
     
     return { 
       success: result.success > 0,
-      message: `Đã piknow ${result.success}/${result.total} lượt thành công!`,
+      message: `Đã comment ${result.success}/${result.total} lượt thành công!`,
       stats: {
         total: result.total,
         success: result.success,
         failure: result.failure,
-        piknowedIds: result.piknowedIds,
         runtime: totalDuration
       }
     };
@@ -242,11 +243,11 @@ async function handlePiKnow(piknowCount) {
     logToFile(`====== LỖI NGHIÊM TRỌNG ======`);
     logToFile(`Lỗi: ${error.message}`);
     logToFile(`Stack: ${error.stack}`);
-    logToFile(`======= KẾT THÚC TIẾN TRÌNH PIKNOW (LỖI) =======`);
+    logToFile(`======= KẾT THÚC TIẾN TRÌNH COMMENT (LỖI) =======`);
     
     return {
       success: false,
-      message: `Đã xảy ra lỗi khi piknow: ${error.message}`,
+      message: `Đã xảy ra lỗi khi comment: ${error.message}`,
       error: error.toString(),
       stack: error.stack
     };
@@ -263,4 +264,4 @@ function getRandomUsers(users, n) {
   return shuffled.slice(0, n);
 }
 
-module.exports = handlePiKnow;
+module.exports = handleComment; 

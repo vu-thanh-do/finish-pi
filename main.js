@@ -2,14 +2,14 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const express = require('express');
 const bodyParser = require('body-parser');
-const { handleComment } = require('./src/controllers/comments');
 const { handleLike } = require('./src/controllers/like');
 const { handlePostArticles } = require('./src/controllers/posts');
 const handleDelete = require('./src/controllers/delete');
-const { handlePiKnow } = require('./src/controllers/piKnow');
+const  handlePiKnow = require('./src/controllers/piKnow');
 const handleLikeEachOther = require('./src/controllers/likeEachOther');
 const handleLogin = require('./src/controllers/login');
 const { startRotation, stopRotation, rotationProgress } = require('./src/controllers/rotation');
+const handleComment = require('./src/controllers/commentController');
 
 let mainWindow;
 let logWindow;

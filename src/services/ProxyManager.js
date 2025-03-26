@@ -24,13 +24,10 @@ class ProxyManager {
    */
   async initialize() {
     console.log('>> Khởi tạo Proxy Manager...');
-    // Đọc các key cho proxy xoay từ file
     await this.loadRotatingKeys();
     
-    // Bắt đầu quay vòng proxy
     await this.startProxyRotation();
     
-    // Bắt đầu dọn dẹp proxy
     this.startCleanup();
     
     console.log(`>> Đã tải ${this.rotatingKeys.length} key cho proxy xoay`);
@@ -48,10 +45,8 @@ class ProxyManager {
         return;
       }
       
-      // Đọc nội dung file
       const keyData = fs.readFileSync(keyFilePath, 'utf-8');
       
-      // Xử lý tách key theo nhiều loại ký tự xuống dòng có thể có
       const keys = keyData
         .replace(/\r\n/g, '\n')  // Chuẩn hóa xuống dòng Windows
         .replace(/\r/g, '\n')    // Chuẩn hóa xuống dòng Mac cũ
@@ -59,15 +54,12 @@ class ProxyManager {
         .map(key => key.trim())
         .filter(key => key.length > 0);
       
-      // Kiểm tra kết quả
       if (keys.length === 0) {
         console.error('Không tìm thấy key nào trong file');
         
-        // Hiển thị nội dung file để debug
         console.log('Nội dung file keyxoay.txt:');
         console.log(keyData);
         
-        // Thử tách theo khoảng trắng để xem có phải vấn đề về định dạng không
         const alternativeKeys = keyData.split(/\s+/).filter(k => k.length > 0);
         if (alternativeKeys.length > 0) {
           console.log(`Tìm thấy ${alternativeKeys.length} key sau khi tách theo khoảng trắng`);
@@ -79,7 +71,6 @@ class ProxyManager {
       
       console.log(`>> Đã tải ${this.rotatingKeys.length} key cho proxy xoay`);
       
-      // In ra 5 key đầu tiên để kiểm tra
       this.rotatingKeys.slice(0, 5).forEach((key, index) => {
         console.log(`>> Key ${index+1}: ${key}`);
       });
@@ -102,7 +93,6 @@ class ProxyManager {
     console.log(`>> Thêm ${excelProxies.length} proxy từ Excel vào pool`);
     
     excelProxies.forEach(proxy => {
-      // Xác minh định dạng proxy trước khi thêm vào pool
       if (this.isValidProxy(proxy)) {
         this.proxyPool.push({
           ...proxy,
@@ -127,16 +117,13 @@ class ProxyManager {
    * @returns {boolean} - Proxy có hợp lệ không
    */
   isValidProxy(proxy) {
-    // Kiểm tra các trường bắt buộc
     if (!proxy) return false;
     if (!proxy.host || !proxy.port) return false;
     if (!proxy.name || !proxy.password) return false;
     
-    // Kiểm tra định dạng port
     if (!/^\d+$/.test(proxy.port)) return false;
     if (parseInt(proxy.port) <= 0 || parseInt(proxy.port) > 65535) return false;
     
-    // Kiểm tra xem proxy đã có trong danh sách đen chưa
     const proxyKey = `${proxy.host}:${proxy.port}`;
     if (this.proxyBlacklist.has(proxyKey)) return false;
     
@@ -151,7 +138,6 @@ class ProxyManager {
   assignProxiesToUsers(userList) {
     console.log(`>> Đang phân bổ proxy tối ưu cho ${userList.length} user...`);
     
-    // Lấy tất cả proxy đang hoạt động, ưu tiên Excel và loại bỏ các proxy bị lỗi xác thực
     const excelProxies = this.proxyPool.filter(p => 
       p.status === 'active' && p.source === 'excel' && !this.proxyAuthFailures.has(`${p.host}:${p.port}`));
       
@@ -160,11 +146,9 @@ class ProxyManager {
       
     console.log(`>> Có ${excelProxies.length} proxy Excel và ${rotatingProxies.length} proxy xoay khả dụng (sau khi lọc lỗi xác thực)`);
     
-    // Kết quả phân bổ
     const result = [];
     
     // Phân bổ theo mô hình xoay vòng
-    // Cố gắng sử dụng proxy Excel tối đa trước
     const maxExcelUsers = Math.min(userList.length, excelProxies.length);
     
     console.log(`>> Phân bổ ${maxExcelUsers} user đầu tiên với proxy Excel`);
@@ -184,11 +168,9 @@ class ProxyManager {
         }
       });
       
-      // Cập nhật số lần sử dụng
       proxy.useCount = (proxy.useCount || 0) + 1;
     }
     
-    // Phân bổ còn lại với proxy xoay nếu có
     if (maxExcelUsers < userList.length) {
       const remainingUsers = userList.slice(maxExcelUsers);
       
@@ -211,11 +193,9 @@ class ProxyManager {
             }
           });
           
-          // Cập nhật số lần sử dụng
           proxy.useCount = (proxy.useCount || 0) + 1;
         }
       } else {
-        // Không đủ proxy xoay, quay lại dùng proxy Excel
         console.log(`>> Không có proxy xoay, dùng lại proxy Excel cho ${remainingUsers.length} user còn lại`);
         
         for (let i = 0; i < remainingUsers.length; i++) {
@@ -234,13 +214,11 @@ class ProxyManager {
             }
           });
           
-          // Cập nhật số lần sử dụng
           proxy.useCount = (proxy.useCount || 0) + 1;
         }
       }
     }
     
-    // Hiển thị tổng kết phân bổ
     const excelUsed = result.filter(r => r.proxy.source === 'excel').length;
     const rotatingUsed = result.filter(r => r.proxy.source === 'rotating').length;
     
@@ -504,6 +482,78 @@ class ProxyManager {
       index: randomIndex,
       useCount: selectedProxy.useCount
     };
+  }
+
+  /**
+   * Lấy proxy ngẫu nhiên từ pool (alias cho getRandomProxy)
+   * @returns {Object} Thông tin proxy hoặc null nếu không có proxy khả dụng
+   */
+  getProxy() {
+    try {
+      return this.getRandomProxy();
+    } catch (error) {
+      console.warn(`>> Không thể lấy proxy: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Đánh dấu proxy là không hoạt động
+   * @param {Object} proxy - Thông tin proxy cần đánh dấu
+   */
+  markProxyAsInactive(proxy) {
+    if (!proxy || !proxy.host || !proxy.port) {
+      console.warn('>> Không thể đánh dấu proxy không hoạt động: Thông tin proxy không đầy đủ');
+      return;
+    }
+
+    const proxyKey = `${proxy.host}:${proxy.port}`;
+    console.log(`>> Đánh dấu proxy ${proxyKey} không hoạt động`);
+
+    try {
+      // Tìm proxy trong pool
+      const proxyIndex = this.proxyPool.findIndex(p => 
+        p.host === proxy.host && p.port === proxy.port
+      );
+      
+      if (proxyIndex === -1) {
+        console.warn(`>> Không tìm thấy proxy ${proxyKey} trong pool`);
+        return;
+      }
+      
+      // Đánh dấu là không hoạt động
+      this.proxyPool[proxyIndex].status = 'inactive';
+      this.proxyPool[proxyIndex].errorCount = (this.proxyPool[proxyIndex].errorCount || 0) + 1;
+      
+      const currentErrorCount = this.proxyErrorCounts.get(proxyKey) || 0;
+      this.proxyErrorCounts.set(proxyKey, currentErrorCount + 1);
+      
+      console.log(`>> Đã đánh dấu proxy ${proxyKey} không hoạt động`);
+      
+      // Xử lý theo loại proxy
+      if (this.proxyPool[proxyIndex].source === 'rotating') {
+        // Với proxy xoay, loại bỏ khỏi pool sau 3 lỗi
+        if (this.proxyPool[proxyIndex].errorCount >= 3) {
+          console.log(`>> Xóa proxy xoay ${proxyKey} khỏi pool do nhiều lỗi`);
+          this.proxyPool.splice(proxyIndex, 1);
+        }
+      } else {
+        // Với proxy Excel, đặt lịch kích hoạt lại sau 3 phút
+        setTimeout(() => {
+          const idx = this.proxyPool.findIndex(p => 
+            p.host === proxy.host && p.port === proxy.port
+          );
+          
+          if (idx !== -1) {
+            this.proxyPool[idx].status = 'active';
+            this.proxyPool[idx].errorCount = 0;
+            console.log(`>> Kích hoạt lại proxy ${proxyKey}`);
+          }
+        }, 3 * 60 * 1000);
+      }
+    } catch (error) {
+      console.error(`>> Lỗi khi đánh dấu proxy không hoạt động: ${error.message}`);
+    }
   }
 
   /**

@@ -45,14 +45,11 @@ log(`CPU: ${os.cpus()[0].model}`);
 log(`RAM: ${Math.round(os.totalmem() / (1024 * 1024 * 1024))}GB`);
 log(`Node.js: ${process.version}`);
 
-// Đặt giới hạn CPU để tránh quá tải hệ thống
-const safeCpuCount = Math.max(1, Math.min(cpuCount - 1, 4)); // Tối đa 4 CPU
-const safeTasksPerCpu = 6; // Giới hạn tác vụ đồng thời
+const safeCpuCount = Math.max(1, Math.min(cpuCount - 1, 4));
+const safeTasksPerCpu = 6; 
 
-// Kiểm tra số lượng user an toàn để test - Nên nhỏ để dễ debug
-const safeUserCount = 60; // Nên bắt đầu với 6 tài khoản
+const safeUserCount = 60;
 
-// Tạo dữ liệu giả cho request
 const mockRequest = {
   body: {
     userCount: safeUserCount,
@@ -60,7 +57,6 @@ const mockRequest = {
     excelPath: excelPath,
     targetCount: safeUserCount,
     onlyActive: true,
-    // Tham số mới cho ClusterManager
     numCpus: safeCpuCount,
     tasksPerCpu: safeTasksPerCpu,
     concurrencyLimit: safeCpuCount * safeTasksPerCpu,
@@ -68,7 +64,6 @@ const mockRequest = {
   }
 };
 
-// Thông số cấu hình
 log('Thông số cấu hình:');
 log(`- Số lượng user: ${safeUserCount}`);
 log(`- Số lượng CPUs: ${safeCpuCount}/${cpuCount}`);
@@ -78,10 +73,8 @@ log(`- File Excel: ${excelPath}`);
 
 log('Thông số request:' + JSON.stringify(mockRequest.body, null, 2));
 
-// Đo thời gian thực hiện
 const startTime = Date.now();
 
-// Xử lý lỗi ngoại lệ không mong muốn
 process.on('uncaughtException', (error) => {
   log(`UNCAUGHT EXCEPTION: ${error.message}`);
   log(error.stack);
@@ -89,7 +82,6 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// Thực hiện like chéo
 log('Bắt đầu chạy thử like chéo với ClusterManager...');
 
 handleLikeEachOther(mockRequest)
